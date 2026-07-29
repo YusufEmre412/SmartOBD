@@ -70,22 +70,126 @@ const WMI_MAP = {
     '1H': 'Honda',
     'JHM': 'Honda',
     '1HG': 'Honda',
+    'JH4': 'Honda',
     '1NX': 'Toyota',
+    'JT2': 'Toyota',
+    'JT3': 'Toyota',
+    '4T1': 'Toyota',
+    '5TD': 'Toyota',
     'WBA': 'BMW',
     '5UX': 'BMW',
     'WDC': 'Mercedes-Benz',
+    'WDD': 'Mercedes-Benz',
+    'WDB': 'Mercedes-Benz',
     'WAU': 'Audi',
+    'TRU': 'Audi',
     'WP0': 'Porsche',
+    'WVW': 'Volkswagen',
+    '1VW': 'Volkswagen',
     'JN': 'Nissan',
     'KM8': 'Hyundai',
-    'KNA': 'Kia'
+    'KMH': 'Hyundai',
+    'KME': 'Hyundai',
+    'KNA': 'Kia',
+    'KNM': 'Kia',
+    'VF1': 'Renault',
+    'VF3': 'Peugeot',
+    'SAL': 'Land Rover',
+    'SAJ': 'Jaguar',
+    'JM1': 'Mazda',
+    'JM7': 'Mazda'
+};
+
+const YEAR_MAP = {
+    '1': '2001', '2': '2002', '3': '2003', '4': '2004', '5': '2005', '6': '2006', '7': '2007', '8': '2008', '9': '2009',
+    'A': '2010', 'B': '2011', 'C': '2012', 'D': '2013', 'E': '2014', 'F': '2015', 'G': '2016', 'H': '2017', 'J': '2018',
+    'K': '2019', 'L': '2020', 'M': '2021', 'N': '2022', 'P': '2023', 'R': '2024', 'S': '2025', 'T': '2026'
+};
+
+const VDS_MAP = {
+    'ZV4C': 'X5'
 };
 
 function decodeVIN(vin) {
-    if (!vin || vin.length < 3) return 'Unknown';
+    if (!vin || vin.length < 3) return { make: 'Unknown', vehicle_name: 'Unknown' };
     const wmi3 = vin.substring(0, 3).toUpperCase();
     const wmi2 = vin.substring(0, 2).toUpperCase();
-    return WMI_MAP[wmi3] || WMI_MAP[wmi2] || 'Unknown';
+    const make = WMI_MAP[wmi3] || WMI_MAP[wmi2] || 'Unknown';
+    
+    if (vin.length !== 17) {
+        return { make, vehicle_name: make };
+    }
+
+    let model = '';
+    for (let key in VDS_MAP) {
+        if (vin.toUpperCase().includes(key)) {
+            model = VDS_MAP[key];
+            break;
+        }
+    }
+    
+    const yearChar = vin.substring(9, 10).toUpperCase(); // 10th char
+    const year = YEAR_MAP[yearChar] || '';
+
+    let vehicle_name = `${year} ${make} ${model}`.replace(/\s+/g, ' ').trim();
+    if (vehicle_name === '') vehicle_name = 'Unknown';
+    else if (vehicle_name === make) vehicle_name = make;
+    
+    return { make, vehicle_name };
+}
+
+async function decodeVINWithAPI(vin) {
+    if (!vin || vin.length !== 17) {
+        return decodeVIN(vin);
+    }
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    
+    try {
+        const response = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) throw new Error("API response not OK");
+        
+        const data = await response.json();
+        
+        let make = '';
+        let model = '';
+        let year = '';
+        
+        if (data && data.Results) {
+            for (const item of data.Results) {
+                if (item.Variable === "Make") make = item.Value || '';
+                if (item.Variable === "Model") model = item.Value || '';
+                if (item.Variable === "Model Year") year = item.Value || '';
+            }
+        }
+        
+        if (!make || make === "null" || make === "Unknown" || make === "") throw new Error("Missing Make from API");
+        
+        // Sometimes the API returns "MAZDA" or "Mazda" we can capitalize properly if we want, but uppercase or as-is is fine.
+        // Convert to title case for cleaner output
+        const titleCase = (str) => str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        
+        make = titleCase(make);
+        if (model) model = titleCase(model);
+        
+        let vehicle_name = `${year} ${make} ${model}`.replace(/\s+/g, ' ').trim();
+        
+        return {
+            make: make,
+            model: model,
+            year: year,
+            vehicle_name: vehicle_name
+        };
+    } catch (error) {
+        clearTimeout(timeoutId);
+        console.warn(`[Diagnostic Engine] NHTSA API failed for VIN ${vin}:`, error.message, "- Falling back to local WMI parser.");
+        return decodeVIN(vin);
+    }
 }
 
 async function analyzeCodes({ dtcs: codes, vin, make, symptoms }) {
@@ -95,7 +199,9 @@ async function analyzeCodes({ dtcs: codes, vin, make, symptoms }) {
         return { root_cause: "Unknown", confidence: 0, is_manufacturer_specific: false, breakdown: "No codes provided or invalid format.", recommended_actions: [] };
     }
 
-    const decodedMake = make || decodeVIN(vin);
+    const decodedInfo = await decodeVINWithAPI(vin);
+    const decodedMake = make || decodedInfo.make;
+    const vehicleName = decodedInfo.vehicle_name !== 'Unknown' ? decodedInfo.vehicle_name : (make || 'Unknown');
     const hasManufacturerSpecific = codes.some(code => /^[PCUB][123]\d{3}$/.test(code));
 
     let confidence = 0;
@@ -143,6 +249,7 @@ async function analyzeCodes({ dtcs: codes, vin, make, symptoms }) {
         try {
             const aiResult = await llmService.analyzeWithAI({ dtcs: codes, vin, make: decodedMake, symptoms });
             aiResult.vehicle_make = decodedMake;
+            aiResult.vehicle_name = vehicleName;
             return aiResult;
         } catch (error) {
             console.error("[Diagnostic Engine] LLM Service threw an error:", error);
@@ -158,6 +265,7 @@ async function analyzeCodes({ dtcs: codes, vin, make, symptoms }) {
         breakdown, 
         recommended_actions: [], 
         vehicle_make: decodedMake,
+        vehicle_name: vehicleName,
         diy_guide: {
             required_part: root_cause,
             difficulty_level: "Moderate (Intermediate)",

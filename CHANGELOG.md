@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - Dynamic NHTSA VIN API Integration & Smart Query Sanitizer
+
+### Added:
+- API-based VIN decoding using the NHTSA Vehicle API for dynamic global Make/Model/Year resolution, with a robust 3-second timeout and local WMI fallback.
+- Sleek Vehicle Identification Badge UI (e.g. "2016 Mercedes-Benz E-Class") that proudly displays the dynamically decoded vehicle at the top of the diagnostic results.
+- Smart eBay & YouTube search query sanitizer that automatically strips redundant brand strings and zero-result parenthetical OEM parameters to ensure perfectly optimized part matching.
+
 ## [1.2.0] - DIY Garage Companion & Context-Aware DTC Refinements
 
 ### Added:

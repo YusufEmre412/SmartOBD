@@ -22,8 +22,8 @@ async function analyzeWithAI({ dtcs, vin, make, symptoms }) {
 
         if (!vin && (!make || make === "Unknown")) {
             prompt += `
-        CRITICAL INSTRUCTION: If any of the provided DTCs are manufacturer-specific (e.g., codes starting with P1, B1, C1, U1, etc.), you MUST explicitly state in the \`breakdown\` field that the code is manufacturer-specific and its exact meaning varies by brand (for example, P1525 can mean Brake Light Switch/VANOS for BMW, Cruise Control Limit for Renault/Nissan, or Speed Sensor for others). 
-        You MUST also add a clear warning advising the user to enter their VIN or select their Vehicle Make for a 100% accurate diagnosis.
+        CRITICAL INSTRUCTION: If any of the provided DTCs are manufacturer-specific (e.g., codes starting with P1, B1, C1, U1, etc.), you MUST explain in the \`breakdown\` field that the code is manufacturer-specific and its exact meaning varies by brand (for example, P1525 can mean Brake Light Switch/VANOS for BMW, Cruise Control Limit for Renault/Nissan, or Speed Sensor for others). 
+        DO NOT include any explicit markdown warnings like "**WARNING:**" or similar in the text, as the UI will handle the warning visually. Just explain the variance naturally.
             `;
         }
 

@@ -1,6 +1,27 @@
-import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Activity, Wrench, AlertCircle, Car, Cpu, ListChecks, Clock, PenTool, ShoppingCart, Youtube } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { AlertTriangle, CheckCircle2, Activity, Wrench, AlertCircle, Car, Cpu, ListChecks, Clock, PenTool, ShoppingCart, Youtube, ShieldCheck } from 'lucide-react';
 import { analyzeDTCs } from '../api';
+
+const cleanSearchQuery = (vehicleName, partName) => {
+  let vName = vehicleName && vehicleName !== 'Unknown' ? vehicleName : '';
+  let pName = partName || '';
+  
+  // Strip parenthetical info (e.g., "(OEM: A0025422418)")
+  pName = pName.replace(/\(.*?\)/g, '');
+  
+  if (vName) {
+    // Remove duplicate words (e.g. brand names) that already exist in the vehicle name
+    const vWords = vName.split(/\s+/).filter(w => w.length > 2 && isNaN(w));
+    vWords.forEach(word => {
+      // Escape special characters in word just in case (like hyphen in Mercedes-Benz)
+      const safeWord = word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regex = new RegExp(`\\b${safeWord}\\b`, 'gi');
+      pName = pName.replace(regex, '');
+    });
+  }
+  
+  return `${vName} ${pName}`.replace(/\s+/g, ' ').trim();
+};
 
 export default function DiagnosticPanel() {
   const [codes, setCodes] = useState('');
@@ -10,6 +31,7 @@ export default function DiagnosticPanel() {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const vinInputRef = useRef(null);
 
   const handleAnalyze = async () => {
     if (!codes.trim()) return;
@@ -42,13 +64,15 @@ export default function DiagnosticPanel() {
           const isEvap = dtcArray.includes('P0440') || dtcArray.includes('P0455');
           const isTransmission = dtcArray.includes('P0700') || dtcArray.includes('P0730');
           
+          const isManufacturerSpecific = dtcArray.some(code => /^[PCUB][123]\d{3}$/.test(code));
           let fallbackResult = {
             root_cause: "Unknown",
             confidence: 0,
-            is_manufacturer_specific: false,
+            is_manufacturer_specific: isManufacturerSpecific,
             breakdown: "No codes matched our pattern database.",
             recommended_actions: [],
-            vehicle_make: make || "Unknown"
+            vehicle_make: make || "Unknown",
+            vehicle_name: make || "Unknown"
           };
 
           if (isVacuumLeak) {
@@ -99,6 +123,7 @@ export default function DiagnosticPanel() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <input 
+            ref={vinInputRef}
             type="text" 
             className="input-field uppercase" 
             placeholder="VIN (Optional)"
@@ -143,6 +168,41 @@ export default function DiagnosticPanel() {
 
       {analysis && (
         <div className="mt-6 border-t border-slate-700/50 pt-6 animate-in fade-in slide-in-from-bottom-2">
+          {vin && vin.length === 17 && analysis.vehicle_name && analysis.vehicle_name !== 'Unknown' && (
+            <div className="mb-6 p-4 bg-primary-500/10 border border-primary-500/30 rounded-lg flex items-center gap-3">
+              <div className="p-2 bg-primary-500/20 rounded-full text-primary-500 shrink-0">
+                <ShieldCheck size={24} />
+              </div>
+              <div>
+                <h4 className="text-primary-500 font-bold text-sm uppercase tracking-wider mb-1">Vehicle Identified</h4>
+                <p className="text-primary-300 font-bold">🚗 {analysis.vehicle_name}</p>
+              </div>
+            </div>
+          )}
+
+          {analysis.is_manufacturer_specific && (!analysis.vehicle_make || analysis.vehicle_make === 'Unknown') && (
+            <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="p-2 bg-yellow-500/20 rounded-full text-yellow-500 shrink-0">
+                  <AlertTriangle size={24} />
+                </div>
+                <div>
+                  <h4 className="text-yellow-500 font-bold text-sm uppercase tracking-wider mb-1 flex items-center gap-2">⚠️ Vehicle Context Required for Accurate Diagnosis</h4>
+                  <p className="text-yellow-400/80 text-sm">This is a manufacturer-specific code. Its meaning varies wildly across brands (e.g., BMW vs. Renault). Please provide your vehicle details for an accurate diagnosis.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  vinInputRef.current?.focus();
+                  vinInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }}
+                className="shrink-0 bg-yellow-500 hover:bg-yellow-600 text-dark-900 font-bold py-2 px-4 rounded-md transition-colors text-sm whitespace-nowrap"
+              >
+                Focus VIN Input
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
             <h3 className="text-lg font-medium text-white flex items-center gap-2">
               <AlertTriangle className={analysis.confidence > 70 ? "text-accent-500" : "text-yellow-500"} size={20} />
@@ -217,7 +277,7 @@ export default function DiagnosticPanel() {
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <a 
-                  href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent((analysis.vehicle_make && analysis.vehicle_make !== 'Unknown' ? analysis.vehicle_make + ' ' : '') + analysis.diy_guide.required_part)}`}
+                  href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(cleanSearchQuery(analysis.vehicle_name, analysis.diy_guide.required_part))}`}
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors text-sm font-medium"
@@ -226,7 +286,7 @@ export default function DiagnosticPanel() {
                   Shop Parts
                 </a>
                 <a 
-                  href={`https://www.youtube.com/results?search_query=${encodeURIComponent((analysis.vehicle_make && analysis.vehicle_make !== 'Unknown' ? analysis.vehicle_make + ' ' : '') + analysis.diy_guide.search_keywords + ' replacement guide')}`}
+                  href={`https://www.youtube.com/results?search_query=${encodeURIComponent(cleanSearchQuery(analysis.vehicle_name, analysis.diy_guide.search_keywords) + ' replacement guide')}`}
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md transition-colors text-sm font-medium"
