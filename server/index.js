@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -12,10 +13,14 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // API: Multi-Code Analytical Engine
-app.post('/api/analyze', validateDTCRequest, (req, res) => {
-    const { dtcs } = req.body; // Sanitized by middleware
-    const analysis = analyzeCodes(dtcs);
-    res.json(analysis);
+app.post('/api/analyze', validateDTCRequest, async (req, res) => {
+    const { dtcs, vin, make, symptoms } = req.body; // dtcs sanitized by middleware
+    try {
+        const analysis = await analyzeCodes({ dtcs, vin, make, symptoms });
+        res.json(analysis);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // API: Maintenance Logs CRUD

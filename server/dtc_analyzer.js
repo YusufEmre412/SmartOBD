@@ -3,6 +3,8 @@
  * Analyzes multiple DTCs to find correlations and predict the root cause.
  */
 
+const llmService = require('./llm_service');
+
 const DTCDatabase = {
     // Engine/Fuel/Air
     "P0171": { system: "Fuel", symptom: "System Too Lean (Bank 1)" },
@@ -61,10 +63,40 @@ const RootCausePatterns = [
     }
 ];
 
-function analyzeCodes(codes) {
+const WMI_MAP = {
+    '1G': 'General Motors',
+    '1F': 'Ford',
+    '1C': 'Chrysler',
+    '1H': 'Honda',
+    'JHM': 'Honda',
+    '1HG': 'Honda',
+    '1NX': 'Toyota',
+    'WBA': 'BMW',
+    '5UX': 'BMW',
+    'WDC': 'Mercedes-Benz',
+    'WAU': 'Audi',
+    'WP0': 'Porsche',
+    'JN': 'Nissan',
+    'KM8': 'Hyundai',
+    'KNA': 'Kia'
+};
+
+function decodeVIN(vin) {
+    if (!vin || vin.length < 3) return 'Unknown';
+    const wmi3 = vin.substring(0, 3).toUpperCase();
+    const wmi2 = vin.substring(0, 2).toUpperCase();
+    return WMI_MAP[wmi3] || WMI_MAP[wmi2] || 'Unknown';
+}
+
+async function analyzeCodes({ dtcs: codes, vin, make, symptoms }) {
+    console.log(`[Diagnostic Engine] Request Received - DTCs: ${codes.join(', ')}, VIN: ${vin || 'N/A'}, Make: ${make || 'N/A'}`);
+    
     if (!codes || !Array.isArray(codes) || codes.length === 0) {
-        return { root_cause: "Unknown", confidence: 0, breakdown: "No codes provided or invalid format." };
+        return { root_cause: "Unknown", confidence: 0, is_manufacturer_specific: false, breakdown: "No codes provided or invalid format.", recommended_actions: [] };
     }
+
+    const decodedMake = make || decodeVIN(vin);
+    const hasManufacturerSpecific = codes.some(code => /^[PCUB][123]\d{3}$/.test(code));
 
     let confidence = 0;
     let root_cause = "Indeterminate";
@@ -78,10 +110,6 @@ function analyzeCodes(codes) {
             recognizedCount++;
         }
     });
-
-    if (recognizedCount === 0) {
-        return { root_cause: "Unknown", confidence: 0, breakdown: "None of the provided codes were recognized in the SmartOBD Database." };
-    }
 
     RootCausePatterns.forEach(pattern => {
         const matches = pattern.required_codes.filter(c => codes.includes(c));
@@ -110,7 +138,20 @@ function analyzeCodes(codes) {
         confidence = Math.min(confidence + (codes.length * 5), 95);
     }
 
-    return { root_cause, confidence, breakdown };
+    if (recognizedCount === 0 || hasManufacturerSpecific || (symptoms && symptoms.trim().length > 0) || confidence < 50) {
+        console.log(`[Diagnostic Engine] Routing to LLM Service. (Recognized: ${recognizedCount}, Manufacturer Specific: ${hasManufacturerSpecific}, Confidence: ${confidence})`);
+        try {
+            const aiResult = await llmService.analyzeWithAI({ dtcs: codes, vin, make: decodedMake, symptoms });
+            aiResult.vehicle_make = decodedMake;
+            return aiResult;
+        } catch (error) {
+            console.error("[Diagnostic Engine] LLM Service threw an error:", error);
+            throw error; // Let the route handler catch it
+        }
+    }
+
+    console.log(`[Diagnostic Engine] Routing to Local Rule Engine. (Confidence: ${confidence})`);
+    return { root_cause, confidence, is_manufacturer_specific: false, breakdown, recommended_actions: [], vehicle_make: decodedMake };
 }
 
 module.exports = { analyzeCodes, DTCDatabase };

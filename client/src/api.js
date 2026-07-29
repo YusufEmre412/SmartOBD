@@ -1,10 +1,10 @@
 const API_BASE = 'http://localhost:3001/api';
 
-export const analyzeDTCs = async (dtcs) => {
+export const analyzeDTCs = async (payload) => {
     const response = await fetch(`${API_BASE}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dtcs })
+        body: JSON.stringify(payload)
     });
     if (!response.ok) {
         const error = await response.json();

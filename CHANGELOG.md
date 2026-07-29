@@ -2,8 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.0] - Initial Release
+## [1.1.0] - Hybrid Diagnostic Engine & Groq AI Integration
 
+### Added:
+- Integrated Groq SDK with `llama-3.3-70b-versatile` model for ultra-fast, free-tier diagnostic analysis.
+- Enforced structured JSON output matching frontend diagnostic schema.
+- Added US-built BMW VIN support (`5UX` WMI mapping) to `dtc_analyzer.js`.
+
+### Fixed & Improved:
+- Fixed DTC routing regex to correctly intercept manufacturer-specific codes across all chassis systems (`P1-P3`, `B1-B3`, `C1-C3`, `U1-U3`).
+- Improved VIN input handling to dynamically filter out invalid characters (I, O, Q) on keypress.
+- Enhanced graceful fallback handling and terminal error logging for API failures.
+
+## [1.0.0] - Initial Release
 ### Added
 - Core Engine setup for SmartOBD.
 - Multi-Code Analytical Engine (DTC Analyzer).
