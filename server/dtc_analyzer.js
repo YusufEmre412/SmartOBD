@@ -151,7 +151,21 @@ async function analyzeCodes({ dtcs: codes, vin, make, symptoms }) {
     }
 
     console.log(`[Diagnostic Engine] Routing to Local Rule Engine. (Confidence: ${confidence})`);
-    return { root_cause, confidence, is_manufacturer_specific: false, breakdown, recommended_actions: [], vehicle_make: decodedMake };
+    return { 
+        root_cause, 
+        confidence, 
+        is_manufacturer_specific: false, 
+        breakdown, 
+        recommended_actions: [], 
+        vehicle_make: decodedMake,
+        diy_guide: {
+            required_part: root_cause,
+            difficulty_level: "Moderate (Intermediate)",
+            required_tools: ["Basic Hand Tools", "OBD2 Scanner"],
+            estimated_repair_time: "1 - 2 Hours",
+            search_keywords: `${root_cause} replacement`
+        }
+    };
 }
 
 module.exports = { analyzeCodes, DTCDatabase };

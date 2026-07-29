@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Activity, Wrench, AlertCircle, Car, Cpu, ListChecks } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Activity, Wrench, AlertCircle, Car, Cpu, ListChecks, Clock, PenTool, ShoppingCart, Youtube } from 'lucide-react';
 import { analyzeDTCs } from '../api';
 
 export default function DiagnosticPanel() {
@@ -52,11 +52,13 @@ export default function DiagnosticPanel() {
           };
 
           if (isVacuumLeak) {
-            fallbackResult = { ...fallbackResult, root_cause: "Vacuum Leak", confidence: 85, breakdown: "- Matches P0171 and P0300." };
+            fallbackResult = { ...fallbackResult, root_cause: "Vacuum Leak", confidence: 85, breakdown: "- Matches P0171 and P0300.", diy_guide: { required_part: "Vacuum Hose / Intake Gasket", difficulty_level: "Moderate (Intermediate)", required_tools: ["Smoke Machine", "Basic Hand Tools"], estimated_repair_time: "1 - 2 Hours", search_keywords: "vacuum leak repair" } };
           } else if (isEvap) {
-            fallbackResult = { ...fallbackResult, root_cause: "Major EVAP System Leak", confidence: 90, breakdown: "- Matches EVAP codes. Check gas cap." };
+            fallbackResult = { ...fallbackResult, root_cause: "Major EVAP System Leak", confidence: 90, breakdown: "- Matches EVAP codes. Check gas cap.", diy_guide: { required_part: "Gas Cap / Purge Valve", difficulty_level: "Easy (Beginner)", required_tools: ["None"], estimated_repair_time: "15 Minutes", search_keywords: "gas cap replacement" } };
           } else if (isTransmission) {
-            fallbackResult = { ...fallbackResult, root_cause: "Transmission Internal Failure", confidence: 95, breakdown: "- Matches Transmission slipping codes." };
+            fallbackResult = { ...fallbackResult, root_cause: "Transmission Internal Failure", confidence: 95, breakdown: "- Matches Transmission slipping codes.", diy_guide: { required_part: "Transmission Rebuild Kit", difficulty_level: "Hard (Professional Needed)", required_tools: ["Transmission Jack", "Advanced Tools"], estimated_repair_time: "8+ Hours", search_keywords: "transmission rebuild" } };
+          } else {
+            fallbackResult.diy_guide = { required_part: "Generic Part", difficulty_level: "Moderate (Intermediate)", required_tools: ["Basic Hand Tools"], estimated_repair_time: "Unknown", search_keywords: "auto repair" };
           }
 
           setAnalysis(fallbackResult);
@@ -180,6 +182,59 @@ export default function DiagnosticPanel() {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {analysis.diy_guide && (
+            <div className="mt-4 bg-dark-900/50 p-5 rounded-lg border border-slate-700/30 animate-in fade-in slide-in-from-bottom-3">
+              <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <Wrench className="text-primary-500" size={20} />
+                DIY Garage & Part Sourcing
+              </h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                <div className="bg-dark-800/50 p-3 rounded-md border border-slate-700/50">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">Required Part</span>
+                  <span className="text-sm font-medium text-slate-200">{analysis.diy_guide.required_part}</span>
+                </div>
+                <div className="bg-dark-800/50 p-3 rounded-md border border-slate-700/50">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">Difficulty Level</span>
+                  <span className={`text-sm font-medium ${analysis.diy_guide.difficulty_level.includes('Easy') ? 'text-green-400' : analysis.diy_guide.difficulty_level.includes('Hard') ? 'text-red-400' : 'text-yellow-400'}`}>{analysis.diy_guide.difficulty_level}</span>
+                </div>
+                <div className="bg-dark-800/50 p-3 rounded-md border border-slate-700/50 flex flex-col justify-center">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1 flex items-center gap-1"><Clock size={12}/> Estimated Time</span>
+                  <span className="text-sm font-medium text-slate-200">{analysis.diy_guide.estimated_repair_time}</span>
+                </div>
+                <div className="bg-dark-800/50 p-3 rounded-md border border-slate-700/50">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1 flex items-center gap-1"><PenTool size={12}/> Required Tools</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {analysis.diy_guide.required_tools.map((tool, idx) => (
+                      <span key={idx} className="px-2 py-0.5 bg-slate-800 text-slate-300 text-xs rounded border border-slate-700">{tool}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <a 
+                  href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent((analysis.vehicle_make && analysis.vehicle_make !== 'Unknown' ? analysis.vehicle_make + ' ' : '') + analysis.diy_guide.required_part)}`}
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors text-sm font-medium"
+                >
+                  <ShoppingCart size={16} />
+                  Shop Parts
+                </a>
+                <a 
+                  href={`https://www.youtube.com/results?search_query=${encodeURIComponent((analysis.vehicle_make && analysis.vehicle_make !== 'Unknown' ? analysis.vehicle_make + ' ' : '') + analysis.diy_guide.search_keywords + ' replacement guide')}`}
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md transition-colors text-sm font-medium"
+                >
+                  <Youtube size={16} />
+                  YouTube Tutorial
+                </a>
+              </div>
             </div>
           )}
         </div>

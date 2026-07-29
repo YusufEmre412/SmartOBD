@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - DIY Garage Companion & Context-Aware DTC Refinements
+
+### Added:
+- DIY Garage & Part Sourcing feature with eBay/YouTube dynamic links.
+- Tool matrix and difficulty ratings for DIY repair recommendations.
+- Updated LLM context-awareness to provide explicit warnings for manufacturer-specific codes when VIN/Make are missing.
+
 ## [1.1.0] - Hybrid Diagnostic Engine & Groq AI Integration
 
 ### Added:
