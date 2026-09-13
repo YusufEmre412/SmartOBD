@@ -37,6 +37,7 @@ export default function DiagnosticPanel() {
   const [btStatus, setBtStatus] = useState('disconnected'); // disconnected, connecting, connected
   const [fetchedCodes, setFetchedCodes] = useState([]);
   const [activeCode, setActiveCode] = useState('');
+  const [scanZeroCodes, setScanZeroCodes] = useState(false);
 
   // Cleanup Bluetooth connection on unmount
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function DiagnosticPanel() {
     
     setBtStatus('connecting');
     setError(null);
+    setScanZeroCodes(false);
     
     try {
       await bluetoothService.connect(() => {
@@ -73,7 +75,10 @@ export default function DiagnosticPanel() {
          setCodes(dtcs.join(', '));
          handleAnalyze(dtcs[0]);
       } else {
-         setError("Connected to OBD-II, but no active DTCs found.");
+         setFetchedCodes([]);
+         setActiveCode('');
+         setCodes('');
+         setScanZeroCodes(true);
       }
       
     } catch (err) {
@@ -192,6 +197,7 @@ export default function DiagnosticPanel() {
             value={codes}
             onChange={(e) => {
               setCodes(e.target.value);
+              setScanZeroCodes(false);
               if (fetchedCodes.length > 0) {
                 setFetchedCodes([]);
                 setActiveCode('');
@@ -224,6 +230,17 @@ export default function DiagnosticPanel() {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {scanZeroCodes && (
+          <div className="bg-green-500/10 p-4 rounded-lg border border-green-500/30 animate-in fade-in slide-in-from-top-2">
+            <h4 className="text-sm font-semibold text-green-400 mb-2 flex items-center gap-2">
+              <CheckCircle2 size={18} /> Powertrain / Check Engine: All Clear (No active or pending P-codes detected)
+            </h4>
+            <p className="text-xs text-slate-300 bg-dark-900/60 p-3 rounded border border-slate-700/50 mt-3 leading-relaxed">
+              <span className="font-semibold text-slate-200">Note:</span> Standard OBD-II interfaces scan the engine & transmission (Powertrain). If your scanner detected Body (B-codes), Chassis (C-codes), or Network (U-codes) via enhanced modules, you can enter them directly into the input above to run our AI DIY analysis.
+            </p>
           </div>
         )}
 

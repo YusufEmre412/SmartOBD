@@ -224,38 +224,39 @@ class BluetoothService {
 
   async fetchActiveDTCs() {
     try {
-      // 03 is the OBD-II mode for fetching confirmed DTCs
-      const response = await this.sendCommand('03');
+      // Fetch confirmed DTCs (Mode 03) and pending DTCs (Mode 07)
+      const confirmedResponse = await this.sendCommand('03');
+      const pendingResponse = await this.sendCommand('07');
       
-      const lines = response.split('\r').map(l => l.trim()).filter(l => l);
-      let codes = [];
-      
-      for (let i = 0; i < lines.length; i++) {
-        let line = lines[i];
-        if (line.includes('NO DATA') || line.includes('ERROR')) {
-          continue;
+      const parseResponse = (response, modeHex) => {
+        const lines = response.split('\r').map(l => l.trim()).filter(l => l);
+        let parsedCodes = [];
+        for (let i = 0; i < lines.length; i++) {
+          let line = lines[i];
+          if (line.includes('NO DATA') || line.includes('ERROR')) continue;
+          
+          let cleanHex = line.replace(/\s+/g, '');
+          // Mode 03 response starts with 43, Mode 07 response starts with 47
+          if (cleanHex.startsWith(modeHex)) {
+             cleanHex = cleanHex.substring(2);
+             for(let j=0; j < cleanHex.length; j += 4) {
+                const dtcHex = cleanHex.substring(j, j+4);
+                if (dtcHex.length === 4 && dtcHex !== '0000') {
+                   const parsedCode = this.parseDTC(dtcHex);
+                   if (parsedCode) parsedCodes.push(parsedCode);
+                }
+             }
+          }
         }
-        
-        // Remove spaces and multi-frame counters if present
-        let cleanHex = line.replace(/\s+/g, '');
-        // Typical response starts with 43, e.g. 43 01 33 00 00 00 00
-        if (cleanHex.startsWith('43')) {
-           cleanHex = cleanHex.substring(2);
-           
-           // Extract 4-character hex blocks representing DTCs
-           for(let j=0; j < cleanHex.length; j += 4) {
-              const dtcHex = cleanHex.substring(j, j+4);
-              if (dtcHex.length === 4 && dtcHex !== '0000') {
-                 const parsedCode = this.parseDTC(dtcHex);
-                 if (parsedCode && !codes.includes(parsedCode)) {
-                    codes.push(parsedCode);
-                 }
-              }
-           }
-        }
-      }
+        return parsedCodes;
+      };
+
+      const confirmedCodes = parseResponse(confirmedResponse, '43');
+      const pendingCodes = parseResponse(pendingResponse, '47');
       
-      return codes;
+      // Combine and deduplicate
+      const allCodes = Array.from(new Set([...confirmedCodes, ...pendingCodes]));
+      return allCodes;
     } catch (e) {
       console.error("Error fetching DTCs:", e);
       return [];

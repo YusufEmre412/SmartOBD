@@ -25,6 +25,10 @@ async function analyzeWithAI({ dtcs, vin, make, symptoms }) {
         CRITICAL INSTRUCTION: If any of the provided DTCs are manufacturer-specific (e.g., codes starting with P1, B1, C1, U1, etc.), you MUST explain in the \`breakdown\` field that the code is manufacturer-specific and its exact meaning varies by brand (for example, P1525 can mean Brake Light Switch/VANOS for BMW, Cruise Control Limit for Renault/Nissan, or Speed Sensor for others). 
         DO NOT include any explicit markdown warnings like "**WARNING:**" or similar in the text, as the UI will handle the warning visually. Just explain the variance naturally.
             `;
+        } else {
+            prompt += `
+        CRITICAL INSTRUCTION: Ensure you use the exact manufacturer context (Make: ${make}) to decode manufacturer-specific codes. For example, for Toyota/Scion, B1273 indicates a communication error with the Sliding Roof / Sunroof ECU, NOT an airbag issue.
+            `;
         }
 
         prompt += `
@@ -57,7 +61,7 @@ async function analyzeWithAI({ dtcs, vin, make, symptoms }) {
                     content: prompt
                 }
             ],
-            model: "llama-3.3-70b-versatile",
+            model: "openai/gpt-oss-120b",
             temperature: 0.2,
             response_format: { type: "json_object" }
         });

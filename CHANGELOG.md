@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - Universal Multi-System DTC Routing & Dynamic VIN Architecture
+
+### Added:
+- Universal routing across all SAE DTC categories: Body (`B`), Chassis (`C`), Network (`U`), and Powertrain (`P`).
+- Mode 07 (Pending DTCs) Bluetooth query combined with Mode 03 for complete ECU fault scanning.
+- Reassuring "Powertrain / Check Engine: All Clear" banner with dynamic guidance for enhanced module codes.
+
+### Fixed & Improved:
+- Hardened dynamic NHTSA VIN API pipeline against network timeouts, enabling real-time global vehicle make, model, and year resolution.
+- Resolved routing dropouts for non-powertrain codes (`Bxxxx`, `Cxxxx`, `Uxxxx`), ensuring seamless LLM dispatch and precise DIY guides.
+- Expanded local regex WMI fallback coverage for broader international manufacturer identifiers.
+
 ## [1.4.0] - Web Bluetooth BLE Hardware Layer & Multi-DTC Architecture
 
 ### Added:
