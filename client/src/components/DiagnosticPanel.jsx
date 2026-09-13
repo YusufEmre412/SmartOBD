@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { AlertTriangle, CheckCircle2, Activity, Wrench, AlertCircle, Car, Cpu, ListChecks, Clock, PenTool, ShoppingCart, Youtube, ShieldCheck } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { AlertTriangle, CheckCircle2, Activity, Wrench, AlertCircle, Car, Cpu, ListChecks, Clock, PenTool, ShoppingCart, Youtube, ShieldCheck, Bluetooth, BluetoothConnected, BluetoothOff, Smartphone } from 'lucide-react';
 import { analyzeDTCs } from '../api';
+import { bluetoothService } from '../services/bluetoothService';
 
 const cleanSearchQuery = (vehicleName, partName) => {
   let vName = vehicleName && vehicleName !== 'Unknown' ? vehicleName : '';
@@ -33,14 +34,68 @@ export default function DiagnosticPanel() {
   const [error, setError] = useState(null);
   const vinInputRef = useRef(null);
 
-  const handleAnalyze = async () => {
-    if (!codes.trim()) return;
+  const [btStatus, setBtStatus] = useState('disconnected'); // disconnected, connecting, connected
+  const [fetchedCodes, setFetchedCodes] = useState([]);
+  const [activeCode, setActiveCode] = useState('');
+
+  // Cleanup Bluetooth connection on unmount
+  useEffect(() => {
+    return () => {
+      bluetoothService.disconnect();
+    };
+  }, []);
+
+  const handleBluetoothConnect = async () => {
+    if (!bluetoothService.isSupported()) {
+      setError("Web Bluetooth is not supported in this browser. Please use Chrome or Edge.");
+      return;
+    }
+    
+    setBtStatus('connecting');
+    setError(null);
+    
+    try {
+      await bluetoothService.connect(() => {
+        setBtStatus('disconnected');
+      });
+      
+      setBtStatus('connected');
+      
+      const fetchedVin = await bluetoothService.fetchVIN();
+      if (fetchedVin) {
+         setVin(fetchedVin);
+      }
+      
+      const dtcs = await bluetoothService.fetchActiveDTCs();
+      if (dtcs && dtcs.length > 0) {
+         setFetchedCodes(dtcs);
+         setActiveCode(dtcs[0]);
+         setCodes(dtcs.join(', '));
+         handleAnalyze(dtcs[0]);
+      } else {
+         setError("Connected to OBD-II, but no active DTCs found.");
+      }
+      
+    } catch (err) {
+      console.error(err);
+      setBtStatus('disconnected');
+      if (err.name !== 'NotFoundError') {
+        setError("Bluetooth error: " + err.message);
+      }
+    }
+  };
+
+  const handleAnalyze = async (codeOverride = null) => {
+    const isEvent = codeOverride && typeof codeOverride === 'object';
+    const codesToAnalyze = (codeOverride && !isEvent) ? codeOverride : codes;
+
+    if (!codesToAnalyze.trim()) return;
     setLoading(true);
     setError(null);
     setAnalysis(null);
     
     try {
-      const dtcArray = codes.split(',').map(c => c.trim().toUpperCase()).filter(Boolean);
+      const dtcArray = codesToAnalyze.split(',').map(c => c.trim().toUpperCase()).filter(Boolean);
       
       // Validate DTC format locally before sending
       const invalidDTCs = dtcArray.filter(code => !/^[PCUB]\d{4}$/.test(code));
@@ -99,14 +154,33 @@ export default function DiagnosticPanel() {
 
   return (
     <div className="glass-panel p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-3 bg-primary-500/10 rounded-lg text-primary-500">
-          <Activity size={24} />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-primary-500/10 rounded-lg text-primary-500">
+            <Activity size={24} />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-white">Diagnostic Analyzer</h2>
+            <p className="text-sm text-slate-400">Enter DTCs and vehicle information for hybrid analysis</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-semibold text-white">Diagnostic Analyzer</h2>
-          <p className="text-sm text-slate-400">Enter DTCs and vehicle information for hybrid analysis</p>
-        </div>
+
+        <button 
+          onClick={handleBluetoothConnect}
+          disabled={btStatus === 'connecting'}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+            btStatus === 'connected' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+            btStatus === 'connecting' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30 cursor-not-allowed' :
+            'bg-dark-800 hover:bg-dark-700 text-slate-300 border border-slate-700'
+          }`}
+        >
+          {btStatus === 'connected' ? <BluetoothConnected size={18} /> : 
+           btStatus === 'connecting' ? <span className="animate-spin"><Activity size={18}/></span> : 
+           <Bluetooth size={18} />}
+          {btStatus === 'connected' ? 'FIXD Connected' : 
+           btStatus === 'connecting' ? 'Connecting...' : 
+           'Connect FIXD / OBD-II'}
+        </button>
       </div>
 
       <div className="space-y-4 mb-6">
@@ -116,11 +190,43 @@ export default function DiagnosticPanel() {
             className="input-field uppercase" 
             placeholder="DTCs (e.g. P0171, P0300)"
             value={codes}
-            onChange={(e) => setCodes(e.target.value)}
+            onChange={(e) => {
+              setCodes(e.target.value);
+              if (fetchedCodes.length > 0) {
+                setFetchedCodes([]);
+                setActiveCode('');
+              }
+            }}
             onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
           />
         </div>
-        
+
+        {fetchedCodes.length > 0 && (
+          <div className="bg-dark-800/50 p-4 rounded-lg border border-slate-700/50 animate-in fade-in slide-in-from-top-2">
+            <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+              <Cpu size={16} className="text-blue-400" /> Detected Trouble Codes (ECU)
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {fetchedCodes.map(code => (
+                <button
+                  key={code}
+                  onClick={() => {
+                    setActiveCode(code);
+                    handleAnalyze(code);
+                  }}
+                  className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                    activeCode === code 
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20 scale-105'
+                      : 'bg-dark-900 text-slate-400 hover:bg-dark-700 border border-slate-700/50'
+                  }`}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <input 
             ref={vinInputRef}
@@ -153,7 +259,7 @@ export default function DiagnosticPanel() {
           onChange={(e) => setSymptoms(e.target.value)}
         />
         
-        <button className="btn-primary flex items-center justify-center gap-2 w-full md:w-auto px-8" onClick={handleAnalyze} disabled={loading}>
+        <button className="btn-primary flex items-center justify-center gap-2 w-full md:w-auto px-8" onClick={() => handleAnalyze()} disabled={loading}>
           {loading ? <span className="animate-spin text-white"><Wrench size={20}/></span> : <CheckCircle2 size={20} />}
           <span>Analyze</span>
         </button>

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - Web Bluetooth BLE Hardware Layer & Multi-DTC Architecture
+
+### Added:
+- Implemented `src/services/bluetoothService.js` utilizing the Web Bluetooth API to pair with ELM327 BLE scanners (including FIXD devices).
+- Added AT command initialization sequence (`AT Z`, `ATE0`, `ATL0`, `AT SP 0`).
+- Implemented Mode 09 PID 02 VIN extraction directly from the ECU via Bluetooth.
+- Built a Multi-DTC interactive badge container in `DiagnosticPanel.jsx` to parse and dynamically switch between multiple retrieved trouble codes.
+
+### Improved:
+- Added browser capability checks for `navigator.bluetooth` with user-friendly fallback warnings.
+- Integrated automatic VIN population and vehicle identification trigger upon Bluetooth connection.
+
 ## [1.3.0] - Dynamic NHTSA VIN API Integration & Smart Query Sanitizer
 
 ### Added:
