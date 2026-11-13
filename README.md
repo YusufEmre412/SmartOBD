@@ -4,8 +4,8 @@ SmartOBD is a vehicle diagnostic and maintenance tracking application powered by
 
 ## Features
 - **Local Rule Engine**: Quickly identifies common correlations (e.g., Vacuum Leaks, EVAP issues) using a local pattern database.
-- **AI Fallback (Hybrid Routing)**: Automatically delegates to Google Gemini AI for complex, manufacturer-specific (`P1XXX`, `P2XXX`), or unrecognized codes.
-- **VIN Decoding**: Automatically detects the vehicle make from standard World Manufacturer Identifiers (WMI).
+- **AI Fallback (Hybrid Routing)**: Automatically delegates to Groq LLM (GPT-OSS-120B) for complex, manufacturer-specific (`P1XXX`, `P2XXX`, `B1XXX`, `C1XXX`, `U1XXX`), or unrecognized codes.
+- **VIN Decoding**: Dynamically resolves Year, Make, and Model via the NHTSA vPIC API with an offline ISO 3779 WMI fallback.
 - **Maintenance Tracking**: Tracks fluid leaks and general vehicle repair logs.
 
 ## Configuration & Getting Started
@@ -21,7 +21,7 @@ SmartOBD is a vehicle diagnostic and maintenance tracking application powered by
      ```bash
      cp .env.example .env
      ```
-   - Open `.env` and replace `your_api_key_here` with your actual Google Gemini API Key.
+   - Open `.env` and replace `your_api_key_here` with your actual GROQ_API_KEY.
 3. Start the backend server (runs on port 3001 by default):
    ```bash
    npm start
